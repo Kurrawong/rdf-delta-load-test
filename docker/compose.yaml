@@ -20,7 +20,16 @@ services:
       rdf-delta-server:
         condition: service_healthy
     healthcheck:
-      test: [ "CMD", "wget", "-qO-", "http://localhost:3030/myds" ]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3030/myds"]
       retries: 3
       interval: 5s
       timeout: 5s
+  prez:
+    image: ghcr.io/rdflib/prez:latest
+    ports:
+      - 8000:8000
+    depends_on:
+      rdf-delta-fuseki-server:
+        condition: service_healthy
+    environment:
+      SPARQL_ENDPOINT: http://rdf-delta-fuseki-server:3030/myds/sparql
