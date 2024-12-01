@@ -1,12 +1,12 @@
+import logging
 import os
 import re
 import sys
 from pathlib import Path
-from rdflib import Dataset
 
 import httpx
-import logging
 from rdf_graph_gen.rdf_graph_generator import generate_rdf
+from rdflib import Dataset
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler(sys.stderr))
@@ -15,9 +15,21 @@ logger.setLevel(log_level)
 
 
 def get_last_patch_id(rdf_delta_url: str) -> str:
-    response = httpx.post(rdf_delta_url + "$/rpc", json={"opid": "", "operation": "list_datasource", "arg": {}})
-    last_id = "uuid:" + response.json().get("array", [])[-1]
-    return last_id
+    response = httpx.post(
+        url=rdf_delta_url + "$/rpc",
+        json={"opid": "", "operation": "list_datasource", "arg": {}},
+    )
+    ds_ids = response.json().get("array", [])
+    assert len(ds_ids) == 1
+    ds_id = ds_ids[0]
+    response = httpx.post(
+        url=rdf_delta_url + "$/rpc",
+        json={"opid": "", "operation": "describe_log", "arg": {"datasource": ds_id}},
+    )
+    ids = response.json().get("array", [])
+    if len(ids) == 0:
+        return None
+    return ids[-1]
 
 
 def load_data(num_files: int, num_records: int, rdf_delta_url: str, patch_log: str):
@@ -39,7 +51,6 @@ def load_data(num_files: int, num_records: int, rdf_delta_url: str, patch_log: s
         ds.parse(file, format="ttl")
         patch = ds.serialize(format="patch", operation="add", header_prev=prev_id)
         logger.debug(patch)
-        # BUG: this isnt working
         response = client.post(
             url=rdf_delta_url + patch_log,
             content=patch,
@@ -52,6 +63,13 @@ def load_data(num_files: int, num_records: int, rdf_delta_url: str, patch_log: s
         prev_id = re.findall(r"H id <(.*)>", patch)[0]
 
 
+def services_up(services: list[str]) -> bool:
+    for service in services:
+        response = httpx.get(service)
+        response.raise_for_status()
+    return True
+
+
 def main():
     num_files = int(os.environ.get("NUM_FILES", 2))
     num_records = os.environ.get("NUM_RECORDS", 10)
@@ -59,6 +77,7 @@ def main():
     if not rdf_delta_url.endswith("/"):
         rdf_delta_url += "/"
     patch_log = os.environ.get("PATCH_LOG", "myds")
+    assert services_up([rdf_delta_url])
     load_data(num_files, num_records, rdf_delta_url, patch_log)
 
 
