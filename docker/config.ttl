@@ -28,6 +28,6 @@ PREFIX tdb2:    <http://jena.apache.org/2016/tdb#>
 
 :tdb_dataset_readwrite
     rdf:type       tdb2:DatasetTDB2;
-    tdb2:unionDefaultGraph true ;
+    tdb2:unionDefaultGraph false ;
     tdb2:location  "/fuseki/databases/myds" ;
     .

@@ -1,0 +1,13 @@
+# https://taskfile.dev
+
+version: "3"
+
+tasks:
+  dev:
+    env:
+      LT__LOG_LEVEL: INFO
+      LT__PROFILE: dev
+    cmds:
+      - docker compose -f docker/compose.yaml up --wait
+      - poetry run python scripts/main.py
+      - docker compose -f docker/compose.yaml down

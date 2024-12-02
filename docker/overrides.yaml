@@ -1,0 +1,45 @@
+services:
+  redis:
+    profiles:
+      - olis
+    image: redis:7.2-alpine
+    ports:
+      - 8007:6379
+    networks:
+        - loadtest
+    healthcheck:
+      test: "[[ $(redis-cli ping) == 'PONG' ]]"
+      interval: 2s
+      start_interval: 2s
+
+  olis:
+    profiles:
+      - olis
+    # local image built from lawson/azurerediscache branch (needs merging to main)
+    image: olis:azure
+    ports:
+      - 8005:8000
+    networks:
+        - loadtest
+    environment:
+      OLIS__SPARQL_ENDPOINT: http://rdf-delta-fuseki-server:3030/myds/sparql
+      OLIS__SPARQL_UPDATE_ENDPOINT: http://rdf-delta-fuseki-server:3030/myds/sparql
+      OLIS__SECRET_KEY: 123
+      OLIS__REDIS_HOST: redis
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8005"]
+      retries: 3
+      interval: 5s
+      timeout: 5s
+
+  prez:
+    profiles:
+      - olis
+    environment:
+      SPARQL_ENDPOINT: http://olis:8005/sparql
+    depends_on:
+      olis:
+        condition: service_healthy

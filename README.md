@@ -16,6 +16,10 @@ For load testing RDF delta server
 - time taken to execute sparql queries of different kinds,
 - number of failed requests,
 
+- cpu usage
+- memory usage
+- disk usage
+
 ### sub-scenarios
 
 - rapid submission of many small patch logs
