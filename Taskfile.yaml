@@ -11,3 +11,23 @@ tasks:
       - docker compose -f docker/compose.yaml up --wait
       - poetry run python scripts/main.py
       - docker compose -f docker/compose.yaml down
+
+  small_rw:
+    env:
+      LT__LOG_LEVEL: INFO
+      LT__PROFILE: small_read_write
+      LT__DELTA_ENDPOINT: https://gswardfds.azurewebsites.net/
+      LT__PATCH_LOG: myds
+      LT__SPARQL_ENDPOINT: https://gswaprez.azurewebsites.net/
+    cmds:
+      - poetry run python scripts/main.py
+
+  large_sw:
+    env:
+      LT__LOG_LEVEL: INFO
+      LT__PROFILE: large_single_write
+      LT__DELTA_ENDPOINT: https://gswardfds.azurewebsites.net/
+      LT__PATCH_LOG: myds
+      LT__SPARQL_ENDPOINT: https://gswaprez.azurewebsites.net/
+    cmds:
+      - poetry run python scripts/main.py

@@ -9,17 +9,20 @@ logger = logging.getLogger(__name__)
 class PROF(Enum):
     dev = "dev"
     default = "default"
+    small_read_write = "small_read_write"
+    large_single_write = "large_single_write"
 
 
 class Config:
     def __init__(self):
         self.log_level = logging.DEBUG
         self.profile = PROF.dev
-        self.rdf_delta_url = "http://localhost:1066/"
+        self.delta_endpoint = "http://localhost:1066/"
         self.patch_log = "myds"
         self.sparql_endpoint = "http://localhost:8000/"
         self.shape_file = str(Path(__file__).parent.parent / "shapes/book_shape.ttl")
         self.rdf_folder = str(Path(__file__).parent.parent / "rdf")
+        self.http_timeout = 60
 
         for k, v in vars(self).items():
             env_value = os.environ.get(f"LT__{k.upper()}", None)
