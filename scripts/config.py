@@ -31,6 +31,8 @@ class Config:
                     self.__dict__[k] = getattr(logging, env_value.upper())
                 elif k == "profile":
                     self.__dict__[k] = getattr(PROF, env_value.lower())
+                elif k.endswith("endpoint"):
+                    self.__dict__[k] = env_value.rstrip("/") + "/"
                 elif isinstance(v, bool):
                     self.__dict__[k] = self.str_to_bool(env_value)
                 elif isinstance(v, int):
