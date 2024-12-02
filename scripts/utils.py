@@ -1,16 +1,20 @@
 import functools
 import logging
+import random
 import re
+import string
 import time
 import timeit
 import tracemalloc
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
+from uuid import uuid4
 
 import httpx
 from config import config
+from jinja2 import Template
 from rdf_graph_gen.rdf_graph_generator import generate_rdf
-from rdflib import Dataset
+from rdflib import Dataset, Graph
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
@@ -184,3 +188,64 @@ def services_up(required_services: list[str]) -> bool:
         logger.error(e)
         return False
     return True
+
+
+def generate_simple_rdf(output_file: str, number: int) -> None:
+    data = []
+    for i in range(number):
+        data.append(
+            {
+                "id": uuid4(),
+                "title": "".join(
+                    random.choice(string.ascii_letters) for _ in range(100)
+                ),
+                "description": "".join(
+                    random.choice(string.ascii_letters) for _ in range(1150)
+                ),
+            }
+        )
+
+    template = Template(
+        (Path(__file__).parent / "templates" / "rdf.ttl.j2").read_text()
+    )
+    g = Graph().parse(data=template.render(data=data), format="turtle")
+    g.serialize(destination=output_file, format="turtle")
+    return
+
+
+def generate_simple_patches(patch_size: int, total_volume: int) -> None:
+    assert (
+        total_volume >= patch_size
+    ), "Total volume must be greater than the patch size"
+    RECORDS_PER_MB = 760
+    num_patches = total_volume // patch_size
+    logger.info("generating simple random rdf data")
+    errors = 0
+    futures = []
+    with ProcessPoolExecutor() as executor:
+        for file in range(num_patches):
+            futures.append(
+                executor.submit(
+                    generate_simple_rdf,
+                    output_file=Path(config.rdf_folder) / f"file_{file}.ttl",
+                    number=patch_size * RECORDS_PER_MB,
+                )
+            )
+        for i, future in enumerate(futures, 1):
+            try:
+                logger.info(f"generating file {i}/{num_patches}")
+                future.result()
+            except Exception as e:
+                logger.error(e)
+                errors += 1
+    rdf_folder_size = sum(
+        int(f.stat().st_size)
+        for f in Path(config.rdf_folder).glob("**/*")
+        if f.is_file()
+    )
+    logger.info(f"generated {rdf_folder_size / (1024**2):.2f} MB of data")
+    if errors > 0:
+        logger.info(f"failed to generate {errors} files")
+    else:
+        logger.info("all files generated successfully")
+    return
