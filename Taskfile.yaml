@@ -5,7 +5,7 @@ version: "3"
 tasks:
   dev:
     env:
-      LT__LOG_LEVEL: INFO
+      LT__LOG_LEVEL: DEBUG
       LT__PROFILE: dev
     cmds:
       - docker compose -f docker/compose.yaml up --wait
@@ -14,7 +14,6 @@ tasks:
 
   small_rw:
     env:
-      LT__LOG_LEVEL: INFO
       LT__PROFILE: small_read_write
       LT__DELTA_ENDPOINT: https://gswardfds.azurewebsites.net/
       LT__PATCH_LOG: myds
@@ -24,7 +23,6 @@ tasks:
 
   large_sw:
     env:
-      LT__LOG_LEVEL: INFO
       LT__PROFILE: large_single_write
       LT__DELTA_ENDPOINT: https://gswardfds.azurewebsites.net/
       LT__PATCH_LOG: myds

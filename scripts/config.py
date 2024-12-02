@@ -15,7 +15,7 @@ class PROF(Enum):
 
 class Config:
     def __init__(self):
-        self.log_level = logging.DEBUG
+        self.log_level = logging.INFO
         self.profile = PROF.dev
         self.delta_endpoint = "http://localhost:1066/"
         self.patch_log = "myds"
