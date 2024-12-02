@@ -5,13 +5,14 @@ For load testing RDF delta server
 ## Usage
 
 load testing is run by posting data to an rdf delta endpoint and submitting sparql
-queries.
+queries to read the data back out.
 
-The `main.py` module is the entrpoint. To run a load test with a small amount of data
-from cloudshell you can do the following
+The `main.py` module is the entrypoint.
+For Example, to run a load test with a small amount of data you can copy the paste the
+following commands into Azure cloudshell.
 
 > [!IMPORTANT]  
-> be sure to update the URLs to point to your environment
+> be sure to update the delta endpoint and sparql endpoint URLs to point to your environment
 
 ```bash
 git clone https://github.com/Kurrawong/rdf-delta-load-test.git
@@ -29,7 +30,7 @@ export LT__PROFILE="small_read_write"
 python scripts/main.py
 ```
 
-As you can see, the tests need a LT**DELTA_ENDPOINT, LT**PATCH_LOG name and LT\_\_SPARQL_ENDPOINT to
+As you can see, the tests need a LT\_\_DELTA_ENDPOINT, LT\_\_PATCH_LOG name and LT\_\_SPARQL_ENDPOINT to
 work. All of which are set in environment variables.
 
 The LT\_\_PROFILE controls which type of test to run.
@@ -39,6 +40,11 @@ and posts it to the RDF Delta endpoint. It also submits batches of 20 simultaneo
 sparql queries for a total of 500 queries, each requesting 1000 triples.
 
 Alternative profiles are detailed in the [profiles](##profiles) section below.
+
+The load test will profile submission of the data and reading of the queries. However,
+it can not read CPU or Memory Usage of the RDF Delta Server. This should be monitored
+externally as the test suite runs. For example, if running on Azure, you can use
+application insights to track CPU and Memory usage.
 
 ## Profiles
 
