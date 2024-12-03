@@ -5,14 +5,14 @@ version: "3"
 env:
   LT__DELTA_ENDPOINT: https://gswardfds.azurewebsites.net
   LT__PATCH_LOG: myds
-  LT__SPARQL_ENDPOINT: https://gswaprez.azurewebsites.net
+  LT__SPARQL_ENDPOINT: https://gswaprez.azurewebsites.net/sparql
 
 tasks:
   dev:
     env:
       LT__LOG_LEVEL: DEBUG
       LT__DELTA_ENDPOINT: http://localhost:1066
-      LT__SPARQL_ENDPOINT: http://localhost:8000
+      LT__SPARQL_ENDPOINT: http://localhost:8000/sparql
     cmds:
       - docker compose -f docker/compose.yaml up --wait
       - python scripts/main.py

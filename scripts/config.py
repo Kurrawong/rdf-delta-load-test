@@ -11,7 +11,7 @@ class Config:
     :param log_level: logging level
     :param delta_endpoint: rdf delta endpoint
     :param patch_log: rdf delta data source (same as fuseki dataset name)
-    :param sparql_endpoint: sparql endpoint (should not end with /sparql)
+    :param sparql_endpoint: sparql endpoint
     :param shape_file: optional shape file to use for rdf generation
     :param reuse_rdf: default True. to reuse previously generated data
     :param rdf_folder: where generated rdf data is stored
@@ -28,7 +28,7 @@ class Config:
         self.log_level: int = logging.INFO
         self.delta_endpoint: str = "http://localhost:1066/"
         self.patch_log: str = "myds"
-        self.sparql_endpoint: str = "http://localhost:8000/"
+        self.sparql_endpoint: str = "http://localhost:8000/sparql/"
         self.shape_file: str | None = None
         self.reuse_rdf: bool = True
         self.rdf_folder: str = str(Path(__file__).parent.parent / "rdf")

@@ -189,7 +189,7 @@ def submit_patches() -> None:
 def submit_query(client: httpx.Client):
     query = Path(config.query_template)
     response = client.get(
-        url=config.sparql_endpoint + "sparql",
+        url=config.sparql_endpoint,
         params={"query": query.read_text()},
         headers={"Content-Type": "application/sparql-query"},
     )
