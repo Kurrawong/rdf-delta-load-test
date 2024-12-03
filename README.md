@@ -14,18 +14,24 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 
-# install go-task
-sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
-
-# add the go-task binary to PATH
-export PATH=$PATH:~/.local/bin
-
 ```
 
 ## Usage
 
+### Pre baked configurations
+
 The load test configurations are managed using [go-task](https://taskfile.dev). this
-makes it easy to set and override environment variables for each scenario.
+makes it easier to set and override environment variables for each scenario.
+
+> [!NOTE]  
+> if you can't or dont' want to install go-task then you can still run the load test
+> you just need to specify the configuration for each scenario manually. See the
+> [manual configuration](#manual-configuration) section below.
+
+```bash
+# install go-task
+sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+```
 
 You can see a list of all the pre-baked configurations by running:
 
@@ -37,6 +43,44 @@ To run the small read write configuration you would run:
 
 ```bash
 task small_rw
+```
+
+### Manual configurations
+
+You can set up any configuration you want by first setting the appropriate environment
+variables and then running the `scripts/main.py` script.
+
+For example, to run the load test against a remote rdf delta server with the same
+configuration as the `small_rw` task you could run:
+
+```bash
+export LT__DELTA_ENDPOINT="http://my.delta.endpoint/"
+export LT__PATCH_LOG="myds"
+export LT__SPARQL_ENDPOINT="http://my.sparql.endpoint/"
+
+export LT__RDF_FILE_SIZE=30
+export LT__RDF_VOLUME=500
+
+export LT__NUM_QUERIES=500
+export LT__QUERY_CONCURRENCY=20
+
+python scripts/main.py
+```
+
+And to do the same in PowerShell
+
+```powershell
+$env:LT__DELTA_ENDPOINT = "http://my.delta.endpoint/"
+$env:LT__PATCH_LOG = "myds"
+$env:LT__SPARQL_ENDPOINT = "http://my.sparql.endpoint/"
+
+$env:LT__RDF_FILE_SIZE = 30
+$env:LT__RDF_VOLUME = 500
+
+$env:LT__NUM_QUERIES = 500
+$env:LT__QUERY_CONCURRENCY = 20
+
+python scripts/main.py
 ```
 
 ## Configuration
