@@ -2,60 +2,68 @@
 
 For load testing RDF delta server
 
-## Usage
-
-load testing is run by posting data to an rdf delta endpoint and submitting sparql
-queries to read the data back out.
-
-The `main.py` module is the entrypoint.
-For Example, to run a load test with a small amount of data you can copy the paste the
-following commands into Azure cloudshell.
-
-> [!IMPORTANT]  
-> be sure to update the delta endpoint and sparql endpoint URLs to point to your environment
+## Installation
 
 ```bash
+# clone the repo
 git clone https://github.com/Kurrawong/rdf-delta-load-test.git
 cd rdf-delta-load-test
 
+# install python dependencies into a virtual environment
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 
-export LT__DELTA_ENDPOINT="https://rdf.delta.endpoint/"
-export LT__PATCH_LOG="myds"
-export LT__SPARQL_ENDPOINT="https://prez.endpoint/"
-export LT__PROFILE="small_read_write"
+# install go-task
+sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
 
-python scripts/main.py
+# add the go-task binary to PATH
+export PATH=$PATH:~/.local/bin
+
 ```
 
-As you can see, the tests need a LT\_\_DELTA_ENDPOINT, LT\_\_PATCH_LOG name and LT\_\_SPARQL_ENDPOINT to
-work. All of which are set in environment variables.
+## Usage
 
-The LT\_\_PROFILE controls which type of test to run.
+The load test configurations are managed using [go-task](https://taskfile.dev). this
+makes it easy to set and override environment variables for each scenario.
 
-In the above example, the `small_read_write` profile generates 500 Mb of RDF data
-and posts it to the RDF Delta endpoint. It also submits batches of 20 simultaneous
-sparql queries for a total of 500 queries, each requesting 1000 triples.
+You can see a list of all the pre-baked configurations by running:
 
-Alternative profiles are detailed in the [profiles](##profiles) section below.
+```bash
+task --list-all
+```
 
-The load test will profile submission of the data and reading of the queries. However,
-it can not read CPU or Memory Usage of the RDF Delta Server. This should be monitored
-externally as the test suite runs. For example, if running on Azure, you can use
-application insights to track CPU and Memory usage.
+To run the small read write configuration you would run:
 
-## Profiles
+```bash
+task small_rw
+```
 
-The following profiles are available to be set via the LT\_\_PROFILE environment
-variable.
+## Configuration
 
-| profile            | writes                    | read                                                       |
-| ------------------ | ------------------------- | ---------------------------------------------------------- |
-| dev                | 1 Mb files 2 Mb total     | 10 queries, 1000 triples per query, 5 concurrent queries   |
-| small_read_write   | 30 Mb files, 500 Mb total | 500 queries, 1000 triples per query, 20 concurrent queries |
-| large_single_write | 100 Mb file, 100 Mb total | NA                                                         |
+The pre baked configurations are stored in [Taskfile.yaml](./Taskfile.yaml) and can be
+viewed by looking in that file.
+
+The list of run configurations can be extended by editing the [Taskfile.yaml](./Taskfile.yaml)
+
+The full list of configuration options and their default values is given below
+
+| Variable                              | Description                                                              | Default                    |
+| ------------------------------------- | ------------------------------------------------------------------------ | -------------------------- |
+| `LT__LOG_LEVEL`                       | logging level                                                            | `info`                     |
+| `LT__DELTA_ENDPOINT`                  | rdf delta endpoint                                                       | `"http://localhost:1066/"` |
+| `LT__PATCH_LOG`                       | rdf delta data source (same as fuseki dataset name)                      | `"myds"`                   |
+| `LT__SPARQL_ENDPOINT`                 | sparql endpoint (should not end with /sparql)                            | `"http://localhost:8000/"` |
+| `LT__SHAPE_FILE`                      | optional shape file to use for rdf generation                            | `None`                     |
+| `LT__REUSE_RDF`                       | default True. to reuse previously generated data                         | `True`                     |
+| `LT__RDF_FOLDER`                      | where generated rdf data is stored                                       | `rdf`                      |
+| `LT__HTTP_TIMEOUT`                    | timeout for http requests                                                | `60`                       |
+| `LT__RDF_FILE_SIZE`                   | size of individual RDF files to generate (in MB)                         | `1`                        |
+| `LT__RDF_VOLUME`                      | total volume of RDF data to generate (in MB)                             | `2`                        |
+| `LT__QUERY_TEMPLATE`                  | a sparql query to use for testing the queries                            | `queries/simple_select.rq` |
+| `LT__NUM_QUERIES`                     | how many queries to execute                                              | `10`                       |
+| `LT__QUERY_CONCURRENCY`               | how many queries should be executed simultaneously                       | `5`                        |
+| `LT__DELAY_BETWEEN_PATCH_SUBMISSIONS` | a delay (in seconds) between submission of RDF patch logs, defaults to 0 | `0`                        |
 
 ## Scenarios
 
@@ -67,7 +75,6 @@ variable.
 **measurements**
 
 - time taken to load data,
-- time taken to build indexes,
 - time taken to execute sparql queries of different kinds,
 - number of failed requests,
 

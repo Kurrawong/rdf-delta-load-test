@@ -64,7 +64,7 @@ class Config:
         return value.lower() in ("yes", "true", "t", "1")
 
     def __repr__(self):
-        return "\n".join([f"{k}: {v}" for k, v in vars(self).items()])
+        return "CONFIG\n\t" + "\n\t".join([f"{k}: {v}" for k, v in vars(self).items()]) + "\n"
 
 
 config = Config()

@@ -12,6 +12,11 @@ services:
       interval: 2s
       start_interval: 2s
 
+  rdf-delta-fuseki-server:
+    profiles:
+      - olis
+    image: rdf-delta-fuseki-server:latest
+
   olis:
     profiles:
       - olis
@@ -23,14 +28,18 @@ services:
         - loadtest
     environment:
       OLIS__SPARQL_ENDPOINT: http://rdf-delta-fuseki-server:3030/myds/sparql
-      OLIS__SPARQL_UPDATE_ENDPOINT: http://rdf-delta-fuseki-server:3030/myds/sparql
-      OLIS__SECRET_KEY: 123
+      OLIS__SPARQL_UPDATE_ENDPOINT: http://rdf-delta-fuseki-server:3030/myds/update
+      OLIS__SPARQL_USERNAME: admin
+      OLIS__SPARQL_PASSWORD: admin
+      OLIS__SECRET_KEY: insecure-secret-key
       OLIS__REDIS_HOST: redis
     depends_on:
       redis:
         condition: service_healthy
+      rdf-delta-fuseki-server:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8005"]
+      test: ["CMD", "wget", "-qO-", "http://olis:8000/ui/login"]
       retries: 3
       interval: 5s
       timeout: 5s
@@ -40,6 +49,13 @@ services:
       - olis
     environment:
       SPARQL_ENDPOINT: http://olis:8005/sparql
+      SPARQL_USERNAME: admin@example.com
+      SPARQL_PASSWORD: admin
     depends_on:
       olis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://prez:8000/health"]
+      retries: 3
+      interval: 5s
+      timeout: 5s

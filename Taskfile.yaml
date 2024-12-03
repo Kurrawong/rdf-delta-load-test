@@ -6,7 +6,6 @@ env:
   LT__DELTA_ENDPOINT: https://gswardfds.azurewebsites.net
   LT__PATCH_LOG: myds
   LT__SPARQL_ENDPOINT: https://gswaprez.azurewebsites.net
-  LT__QUERY_TEMPLATE: ./scripts/queries/simple_select.rq
 
 tasks:
   dev:
@@ -16,7 +15,7 @@ tasks:
       LT__SPARQL_ENDPOINT: http://localhost:8000
     cmds:
       - docker compose -f docker/compose.yaml up --wait
-      - poetry run python scripts/main.py
+      - python scripts/main.py
       - docker compose -f docker/compose.yaml down
 
   small_rw:
@@ -26,11 +25,11 @@ tasks:
       LT__NUM_QUERIES: 500
       LT__QUERY_CONCURRENCY: 20
     cmds:
-      - poetry run python scripts/main.py
+      - python scripts/main.py
 
   large_sw:
     env:
       LT__RDF_FILE_SIZE: 100
       LT__RDF_VOLUME: 100
     cmds:
-      - poetry run python scripts/main.py
+      - python scripts/main.py
