@@ -1,3 +1,4 @@
 rdf
 .idea/
 __pycache__
+.venv/
