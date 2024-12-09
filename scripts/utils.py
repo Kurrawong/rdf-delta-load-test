@@ -163,7 +163,15 @@ def submit_patches() -> None:
         ds = Dataset()
         ds.parse(file, format="ttl")
         patch = ds.serialize(format="patch", operation="add", header_prev=prev_id)
-        logger.debug(patch)
+        patch = patch.split("\n")
+        newlines = []
+        for line in patch:
+            if "H prev" in line:
+                line += " ."
+            newlines.append(line)
+        #patch = "\n".join(patch)
+        patch = "\n".join(newlines)
+        # logger.debug(patch)
         response = client.post(
             url=config.delta_endpoint + config.patch_log,
             content=patch,
@@ -174,6 +182,9 @@ def submit_patches() -> None:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
             logger.error(e)
+            import sys
+            logger.debug(patch)
+            sys.exit(1)
             errors.append(file)
         prev_id = re.findall(r"H id <(.*)>", patch)[0]
         time.sleep(config.delay_between_patch_submissions)
