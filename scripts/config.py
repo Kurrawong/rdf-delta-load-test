@@ -50,7 +50,8 @@ class Config:
                 if k == "log_level":
                     self.__dict__[k] = getattr(logging, env_value.upper())
                 elif k.endswith("endpoint"):
-                    self.__dict__[k] = env_value.rstrip("/") + "/"
+                    self.__dict__[k] = env_value.rstrip("/")
+                    #+ "/"
                 elif isinstance(v, bool):
                     self.__dict__[k] = self.str_to_bool(env_value)
                 elif isinstance(v, int):
