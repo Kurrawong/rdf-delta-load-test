@@ -157,21 +157,35 @@ def submit_patches() -> None:
     errors = []
     client = httpx.Client(timeout=config.http_timeout)
     prev_id = get_last_patch_id()
+    
+    # Add debug logging
+    logger.debug(f"Initial prev_id: {prev_id}")
+    
     files = list((Path(config.rdf_folder) / f"{config.rdf_file_size}-{config.rdf_volume}").glob("*.ttl"))
     for i, file in enumerate(files, 1):
         logger.info(f"uploading file {i}/{len(files)}")
+        
+        # Add debug logging for each file
+        logger.debug(f"Processing file: {file}")
+        
         ds = Dataset()
         ds.parse(file, format="ttl")
         patch = ds.serialize(format="patch", operation="add", header_prev=prev_id)
+        
+        # Add debug logging for patch
+        logger.debug(f"Generated patch before modification:\n{patch}")
+        
         patch = patch.split("\n")
         newlines = []
         for line in patch:
             if "H prev" in line:
                 line += " ."
             newlines.append(line)
-        #patch = "\n".join(patch)
         patch = "\n".join(newlines)
-        # logger.debug(patch)
+        
+        # Add debug logging for modified patch
+        logger.debug(f"Modified patch:\n{patch}")
+        
         response = client.post(
             url=config.delta_endpoint + config.patch_log,
             content=patch,
@@ -251,7 +265,7 @@ def services_up() -> tuple[bool, bool]:
         delta_up = False
 
     try:
-        response = httpx.get(config.sparql_endpoint)
+        response = httpx.get(config.sparql_endpoint + "?query=ask%20{}")
         logger.debug(f"sparql status: {response.status_code}")
         response.raise_for_status()
     except Exception as e:
