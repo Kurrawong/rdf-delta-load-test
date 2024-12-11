@@ -28,7 +28,7 @@ class Config:
         self.log_level: int = logging.INFO
         self.delta_endpoint: str = "http://localhost:1066/"
         self.patch_log: str = "myds"
-        self.sparql_endpoint: str = "http://localhost:8000/sparql/"
+        self.sparql_endpoint: str = "http://localhost:8000/sparql"
         self.shape_file: str | None = None
         self.reuse_rdf: bool = True
         self.rdf_folder: str = str(Path(__file__).parent.parent / "rdf")
@@ -50,7 +50,8 @@ class Config:
                 if k == "log_level":
                     self.__dict__[k] = getattr(logging, env_value.upper())
                 elif k.endswith("endpoint"):
-                    self.__dict__[k] = env_value.rstrip("/") + "/"
+                    self.__dict__[k] = env_value
+                    #.rstrip("/") + "/"
                 elif isinstance(v, bool):
                     self.__dict__[k] = self.str_to_bool(env_value)
                 elif isinstance(v, int):
