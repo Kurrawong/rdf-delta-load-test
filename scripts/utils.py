@@ -1,3 +1,5 @@
+from pathlib import Path
+from uuid import uuid4
 import functools
 import logging
 import random
@@ -7,34 +9,216 @@ import time
 import timeit
 import tracemalloc
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from pathlib import Path
-from uuid import uuid4
 
 import httpx
 from config import config
 from jinja2 import Template
 from rdf_graph_gen.rdf_graph_generator import generate_rdf
 from rdflib import Dataset, Graph
-import docker
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
 
+class Metrics:
+    def __init__(self):
+        self.start_time = time.time()
+        self.generation_metrics = {}
+        self.upload_metrics = {}
+        self.query_metrics = {}
+        self.container_config = {}
+    
+    def add_container_config(self, container_stats):
+        """Add initial container configuration"""
+        if container_stats:
+            self.container_config = {
+                "Delta Server Memory Limit (MB)": f"{container_stats['docker-rdf-delta-server-1']['memory_limit_mb']:.2f}",
+                "Delta Server Initial Memory (MB)": f"{container_stats['docker-rdf-delta-server-1']['memory_usage_mb']:.2f}",
+                "Delta Server Initial CPU (%)": f"{container_stats['docker-rdf-delta-server-1']['cpu_percent']:.1f}",
+                "Fuseki Server Memory Limit (MB)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['memory_limit_mb']:.2f}",
+                "Fuseki Server Initial Memory (MB)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['memory_usage_mb']:.2f}",
+                "Fuseki Server Initial CPU (%)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['cpu_percent']:.1f}",
+                "Prez Memory Limit (MB)": f"{container_stats['docker-prez-1']['memory_limit_mb']:.2f}",
+                "Prez Initial Memory (MB)": f"{container_stats['docker-prez-1']['memory_usage_mb']:.2f}",
+                "Prez Initial CPU (%)": f"{container_stats['docker-prez-1']['cpu_percent']:.1f}"
+            }
+    
+    def add_generation_metrics(self, total_files, successful, failed, total_size, container_stats=None):
+        total_time = time.time() - self.start_time
+        self.generation_metrics = {
+            "Total Files Generated": total_files,
+            "Successful Generations": successful,
+            "Failed Generations": failed,
+            "Generation Size (MB)": f"{total_size / 1024 / 1024:.2f}",
+            "Generation Time (s)": f"{total_time:.2f}",
+            "Generation Rate (MB/s)": f"{(total_size / 1024 / 1024) / total_time:.2f}"
+        }
+        if container_stats:
+            self.generation_metrics.update({
+                "Delta Server Memory (MB)": f"{container_stats['docker-rdf-delta-server-1']['memory_usage_mb']:.2f}",
+                "Delta Server CPU (%)": f"{container_stats['docker-rdf-delta-server-1']['cpu_percent']:.1f}",
+                "Fuseki Server Memory (MB)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['memory_usage_mb']:.2f}",
+                "Fuseki Server CPU (%)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['cpu_percent']:.1f}"
+            })
+    
+    def add_upload_metrics(self, total_files, successful, failed, total_size, exec_time=None, peak_memory=None, container_stats=None):
+        total_time = time.time() - self.start_time
+        self.upload_metrics = {
+            "Total Files Uploaded": total_files,
+            "Successful Uploads": successful,
+            "Failed Uploads": failed,
+            "Upload Size (MB)": f"{total_size / 1024 / 1024:.2f}",
+            "Upload Time (s)": f"{total_time:.2f}",
+            "Upload Rate (MB/s)": f"{(total_size / 1024 / 1024) / total_time:.2f}",
+            "Execution Time (s)": f"{exec_time:.2f}" if exec_time else "N/A",
+            "Peak Memory (MB)": f"{peak_memory:.2f}" if peak_memory else "N/A"
+        }
+        if container_stats:
+            self.upload_metrics.update({
+                "Delta Server Memory (MB)": f"{container_stats['docker-rdf-delta-server-1']['memory_usage_mb']:.2f}",
+                "Delta Server CPU (%)": f"{container_stats['docker-rdf-delta-server-1']['cpu_percent']:.1f}",
+                "Fuseki Server Memory (MB)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['memory_usage_mb']:.2f}",
+                "Fuseki Server CPU (%)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['cpu_percent']:.1f}"
+            })
+    
+    def add_query_metrics(self, total_queries, successful, failed, total_time, avg_time, qps, exec_time=None, peak_memory=None, container_stats=None):
+        self.query_metrics = {
+            "Total Queries": total_queries,
+            "Successful Queries": successful,
+            "Failed Queries": failed,
+            "Total Query Time (s)": f"{total_time:.2f}",
+            "Avg Query Time (s)": f"{avg_time:.2f}",
+            "Queries/Second": f"{qps:.2f}",
+            "Execution Time (s)": f"{exec_time:.2f}" if exec_time else "N/A",
+            "Peak Memory (MB)": f"{peak_memory:.2f}" if peak_memory else "N/A"
+        }
+        if container_stats:
+            self.query_metrics.update({
+                "Delta Server Memory (MB)": f"{container_stats['docker-rdf-delta-server-1']['memory_usage_mb']:.2f}",
+                "Delta Server CPU (%)": f"{container_stats['docker-rdf-delta-server-1']['cpu_percent']:.1f}",
+                "Fuseki Server Memory (MB)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['memory_usage_mb']:.2f}",
+                "Fuseki Server CPU (%)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['cpu_percent']:.1f}",
+                "Prez Memory (MB)": f"{container_stats['docker-prez-1']['memory_usage_mb']:.2f}",
+                "Prez CPU (%)": f"{container_stats['docker-prez-1']['cpu_percent']:.1f}"
+            })
+    
+    def display_summary(self):
+        alignments = ['left', 'right']
+        
+        # Container Configuration Table
+        if self.container_config:
+            headers = ["Container Configuration", "Value"]
+            rows = list(self.container_config.items())
+            logger.info("\n" + create_table(headers, rows, alignments))
+        
+        # Upload Metrics Table
+        if self.upload_metrics:
+            headers = ["Upload Metrics", "Value"]
+            rows = list(self.upload_metrics.items())
+            logger.info("\n" + create_table(headers, rows, alignments))
+        
+        # Query Metrics Table
+        if self.query_metrics:
+            headers = ["Query Metrics", "Value"]
+            rows = list(self.query_metrics.items())
+            logger.info("\n" + create_table(headers, rows, alignments))
+
+
+class ErrorTracker:
+    def __init__(self):
+        self.query_errors = {
+            'connection': 0,    # Connection/network errors
+            'timeout': 0,       # Request timeouts
+            'http_400': 0,      # Bad requests (malformed queries)
+            'http_500': 0,      # Server errors
+            'other': 0          # Uncategorized errors
+        }
+        self.upload_errors = {
+            'connection': 0,    # Connection/network errors
+            'parse': 0,         # TTL parsing errors
+            'patch': 0,         # Patch creation/serialization errors
+            'http_400': 0,      # Bad requests
+            'http_500': 0,      # Server errors
+            'other': 0          # Uncategorized errors
+        }
+    
+    def add_query_error(self, error: Exception):
+        if isinstance(error, httpx.ConnectError):
+            self.query_errors['connection'] += 1
+        elif isinstance(error, httpx.TimeoutException):
+            self.query_errors['timeout'] += 1
+        elif isinstance(error, httpx.HTTPStatusError):
+            if error.response.status_code == 400:
+                self.query_errors['http_400'] += 1
+            elif error.response.status_code == 500:
+                self.query_errors['http_500'] += 1
+            else:
+                self.query_errors['other'] += 1
+        else:
+            self.query_errors['other'] += 1
+    
+    def add_upload_error(self, error: Exception):
+        if isinstance(error, httpx.ConnectError):
+            self.upload_errors['connection'] += 1
+        elif isinstance(error, (ValueError, SyntaxError)):
+            self.upload_errors['parse'] += 1
+        elif isinstance(error, httpx.HTTPStatusError):
+            if error.response.status_code == 400:
+                self.upload_errors['http_400'] += 1
+            elif error.response.status_code == 500:
+                self.upload_errors['http_500'] += 1
+            else:
+                self.upload_errors['other'] += 1
+        else:
+            self.upload_errors['other'] += 1
+    
+    def display_error_summary(self):
+        if not any(self.query_errors.values()) and not any(self.upload_errors.values()):
+            return
+        
+        headers = ["Error Type", "Count"]
+        rows = []
+        
+        if any(self.upload_errors.values()):
+            rows.extend([
+                ["Upload Errors", ""],
+                *[(f"  {k.replace('_', ' ').title()}", v) 
+                  for k, v in self.upload_errors.items() if v > 0]
+            ])
+        
+        if any(self.query_errors.values()):
+            if rows:  # Add spacing if we have upload errors
+                rows.append(["", ""])
+            rows.extend([
+                ["Query Errors", ""],
+                *[(f"  {k.replace('_', ' ').title()}", v) 
+                  for k, v in self.query_errors.items() if v > 0]
+            ])
+        
+        if rows:
+            logger.info("\nError Summary\n" + create_table(headers, rows))
+
+# Create global instances
+metrics = Metrics()
+error_tracker = ErrorTracker()
+
+
 def profile(func):
     @functools.wraps(func)
     def wrapper_func(*args, **kwargs):
-        exec_time = timeit.default_timer()
-        tracemalloc.start()
-        
-        # Get container stats if available
         container_stats = get_container_stats([
-            'rdf-delta-server',
-            'rdf-delta-fuseki-server'
+            'docker-rdf-delta-server-1',
+            'docker-rdf-delta-fuseki-server-1',
+            'docker-prez-1'
         ])
         
-        value = func(*args, **kwargs)
+        # Add container configuration if not already added
+        if not metrics.container_config and container_stats:
+            metrics.add_container_config(container_stats)
         
+        exec_time = timeit.default_timer()
+        tracemalloc.start()
+        value = func(*args, **kwargs)
         _, peak = tracemalloc.get_traced_memory()
         peak_mb = peak / 10**6
         exec_time = timeit.default_timer() - exec_time
@@ -45,23 +229,10 @@ def profile(func):
             took {exec_time:.2f}s
             peak memory usage {peak_mb:.2f}MB
         """
-        
-        # Add container stats if available
-        if container_stats:
-            log_msg += """
-            Container Stats:
-                RDF Delta Server:
-                    Memory: {stats['rdf-delta-server']['memory_usage_mb']:.2f}MB
-                    CPU: {stats['rdf-delta-server']['cpu_percent']:.1f}%
-                Fuseki Server:
-                    Memory: {stats['rdf-delta-fuseki-server']['memory_usage_mb']:.2f}MB
-                    CPU: {stats['rdf-delta-fuseki-server']['cpu_percent']:.1f}%
-            """.format(stats=container_stats)
-            
         logger.info(log_msg)
         tracemalloc.stop()
 
-        # Handle both query and upload metrics
+        # Update metrics with container stats
         if func.__name__ == 'submit_queries' and isinstance(value, dict):
             metrics.add_query_metrics(
                 total_queries=value['total_queries'],
@@ -71,17 +242,21 @@ def profile(func):
                 avg_time=value['avg_time'],
                 qps=value['qps'],
                 exec_time=exec_time,
-                peak_memory=peak_mb
+                peak_memory=peak_mb,
+                container_stats=container_stats
             )
-        elif func.__name__ == 'submit_patches':
-            # Update the upload metrics with profiling data
-            metrics.upload_metrics.update({
-                "Execution Time (s)": f"{exec_time:.2f}",
-                "Peak Memory (MB)": f"{peak_mb:.2f}"
-            })
+        elif func.__name__ == 'submit_patches' and isinstance(value, dict):
+            metrics.add_upload_metrics(
+                total_files=value['total_files'],
+                successful=value['successful'],
+                failed=value['failed'],
+                total_size=value['total_size'],
+                exec_time=exec_time,
+                peak_memory=peak_mb,
+                container_stats=container_stats
+            )
 
         return value
-
     return wrapper_func
 
 
@@ -218,7 +393,8 @@ def generate_patches() -> None:
         total_files=num_patches,
         successful=num_patches - errors,
         failed=errors,
-        total_size=rdf_folder_size
+        total_size=rdf_folder_size,
+        container_stats=container_stats
     )
     return
 
@@ -248,7 +424,7 @@ def create_table(headers: list, rows: list, alignments: list = None) -> str:
             max_right_width = max(max_right_width, len(right))
 
     # Calculate column widths
-    column_widths = [20, max_left_width + (max_right_width > 0 and max_right_width + 1 or 0) + 2]
+    column_widths = [35, max_left_width + (max_right_width > 0 and max_right_width + 1 or 0) + 2]
     
     def format_cell(content, width, alignment, col_idx):
         content = str(content)
@@ -269,73 +445,6 @@ def create_table(headers: list, rows: list, alignments: list = None) -> str:
         formatted_rows.append(formatted_row)
     
     return "\n".join([separator, header_row, separator, *formatted_rows, separator])
-
-
-class Metrics:
-    def __init__(self):
-        self.start_time = time.time()
-        self.generation_metrics = {}
-        self.upload_metrics = {}
-        self.query_metrics = {}
-    
-    def add_generation_metrics(self, total_files, successful, failed, total_size):
-        total_time = time.time() - self.start_time
-        self.generation_metrics = {
-            "Total Files Generated": total_files,
-            "Successful Generations": successful,
-            "Failed Generations": failed,
-            "Generation Size (MB)": f"{total_size / 1024 / 1024:.2f}",
-            "Generation Time (s)": f"{total_time:.2f}",
-            "Generation Rate (MB/s)": f"{(total_size / 1024 / 1024) / total_time:.2f}"
-        }
-    
-    def add_upload_metrics(self, total_files, successful, failed, total_size, exec_time=None, peak_memory=None):
-        total_time = time.time() - self.start_time
-        self.upload_metrics = {
-            "Total Files Uploaded": total_files,
-            "Successful Uploads": successful,
-            "Failed Uploads": failed,
-            "Upload Size (MB)": f"{total_size / 1024 / 1024:.2f}",
-            "Upload Time (s)": f"{total_time:.2f}",
-            "Upload Rate (MB/s)": f"{(total_size / 1024 / 1024) / total_time:.2f}",
-            "Execution Time (s)": f"{exec_time:.2f}" if exec_time else "N/A",
-            "Peak Memory (MB)": f"{peak_memory:.2f}" if peak_memory else "N/A"
-        }
-    
-    def add_query_metrics(self, total_queries, successful, failed, total_time, avg_time, qps, exec_time=None, peak_memory=None):
-        self.query_metrics = {
-            "Total Queries": total_queries,
-            "Successful Queries": successful,
-            "Failed Queries": failed,
-            "Total Query Time (s)": f"{total_time:.2f}",
-            "Avg Query Time (s)": f"{avg_time:.2f}",
-            "Queries/Second": f"{qps:.2f}",
-            "Execution Time (s)": f"{exec_time:.2f}" if exec_time else "N/A",
-            "Peak Memory (MB)": f"{peak_memory:.2f}" if peak_memory else "N/A"
-        }
-    
-    def display_summary(self):
-        headers = ["Metric", "Value"]
-        alignments = ['left', 'right']
-        
-        rows = []
-        if self.generation_metrics:
-            rows.extend([["Generation Metrics", ""],
-                       *self.generation_metrics.items()])
-        if self.upload_metrics:
-            rows.extend([["", ""],
-                       ["Upload Metrics", ""],
-                       *self.upload_metrics.items()])
-        if self.query_metrics:
-            rows.extend([["", ""],
-                       ["Query Metrics", ""],
-                       *self.query_metrics.items()])
-        
-        logger.info("\nPerformance Test Summary\n" + 
-                   create_table(headers, rows, alignments))
-
-# Create a global metrics instance
-metrics = Metrics()
 
 
 @profile
@@ -386,17 +495,19 @@ def submit_patches() -> None:
     # Calculate metrics
     total_time = time.time() - start_time
     
-    # Add metrics without displaying table
-    metrics.add_upload_metrics(
-        total_files=len(files),
-        successful=successful_uploads,
-        failed=failed_uploads,
-        total_size=total_size
-    )
-    return
+    # Return metrics dict that will be updated by the profile decorator
+    metrics_dict = {
+        'total_files': len(files),
+        'successful': successful_uploads,
+        'failed': failed_uploads,
+        'total_size': total_size
+    }
+    return metrics_dict
 
 
 def submit_query(client: httpx.Client):
+    """Execute a single query and return its execution time"""
+    start_time = time.time()
     query = Path(config.query_template)
     response = client.get(
         url=config.sparql_endpoint,
@@ -404,8 +515,9 @@ def submit_query(client: httpx.Client):
         headers={"Content-Type": "application/sparql-query"},
     )
     response.raise_for_status()
-    logger.debug(response.text)
-    return
+    query_time = time.time() - start_time
+    logger.debug(f"Query took {query_time:.2f}s")
+    return query_time
 
 
 def format_number(value: float, decimals: int = 2) -> str:
@@ -432,15 +544,15 @@ def submit_queries() -> None:
     query_times = []  # Track individual query times
     
     with ThreadPoolExecutor(max_workers=config.query_concurrency) as executor:
+        # Submit all queries
         for i in range(config.num_queries):
-            start_time = time.time()
             futures.append(executor.submit(submit_query, client=client))
 
+        # Collect results
         for i, future in enumerate(futures, 1):
             try:
                 logger.info(f"submitting query {i}/{config.num_queries}")
-                future.result()
-                query_time = time.time() - start_time
+                query_time = future.result()  # Get the actual query time
                 query_times.append(query_time)
                 successful_queries += 1
             except Exception as e:
@@ -448,11 +560,11 @@ def submit_queries() -> None:
                 errors += 1
 
     # Calculate execution-specific metrics
-    total_query_time = sum(query_times)
+    total_query_time = sum(query_times)  # Total time spent in actual queries
     avg_query_time = total_query_time / len(query_times) if query_times else 0
     qps = len(query_times) / total_query_time if total_query_time > 0 else 0
     
-    # Return metrics dict that will be updated by the profile decorator
+    # Return metrics dict
     metrics_dict = {
         'total_queries': config.num_queries,
         'successful': successful_queries,
@@ -500,14 +612,19 @@ def get_container_stats(container_names: list[str]) -> dict:
     try:
         import docker
         client = docker.from_env()
-    except (ImportError, docker.errors.DockerException):
-        # Either docker package not installed or Docker daemon not running
+        logger.info("Docker client created successfully")
+    except (ImportError, ModuleNotFoundError):
+        logger.info("Docker package not installed - skipping container stats")
+        return {}
+    except Exception as e:
+        logger.info(f"Docker not available - {str(e)}")
         return {}
     
     stats = {}
     for name in container_names:
         try:
             container = client.containers.get(name)
+            logger.info(f"Found container: {name}")
             if container.status == 'running':
                 raw_stats = container.stats(stream=False)
                 # Calculate memory usage
@@ -525,88 +642,12 @@ def get_container_stats(container_names: list[str]) -> dict:
                 
                 stats[name] = {
                     'memory_usage_mb': mem_usage / (1024 * 1024),
+                    'memory_limit_mb': mem_limit / (1024 * 1024),
                     'memory_percent': mem_percent,
                     'cpu_percent': cpu_percent
                 }
+                logger.info(f"Got stats for {name}: {stats[name]}")
         except Exception as e:
-            logger.debug(f"Skipping Docker stats for {name}: {e}")
+            logger.info(f"Skipping Docker stats for {name}: {e}")
             
     return stats
-
-
-class ErrorTracker:
-    def __init__(self):
-        self.query_errors = {
-            'connection': 0,    # Connection/network errors
-            'timeout': 0,       # Request timeouts
-            'http_400': 0,      # Bad requests (malformed queries)
-            'http_500': 0,      # Server errors
-            'other': 0          # Uncategorized errors
-        }
-        self.upload_errors = {
-            'connection': 0,    # Connection/network errors
-            'parse': 0,         # TTL parsing errors
-            'patch': 0,         # Patch creation/serialization errors
-            'http_400': 0,      # Bad requests
-            'http_500': 0,      # Server errors
-            'other': 0          # Uncategorized errors
-        }
-    
-    def add_query_error(self, error: Exception):
-        if isinstance(error, httpx.ConnectError):
-            self.query_errors['connection'] += 1
-        elif isinstance(error, httpx.TimeoutException):
-            self.query_errors['timeout'] += 1
-        elif isinstance(error, httpx.HTTPStatusError):
-            if error.response.status_code == 400:
-                self.query_errors['http_400'] += 1
-            elif error.response.status_code == 500:
-                self.query_errors['http_500'] += 1
-            else:
-                self.query_errors['other'] += 1
-        else:
-            self.query_errors['other'] += 1
-    
-    def add_upload_error(self, error: Exception):
-        if isinstance(error, httpx.ConnectError):
-            self.upload_errors['connection'] += 1
-        elif isinstance(error, (ValueError, SyntaxError)):
-            self.upload_errors['parse'] += 1
-        elif isinstance(error, httpx.HTTPStatusError):
-            if error.response.status_code == 400:
-                self.upload_errors['http_400'] += 1
-            elif error.response.status_code == 500:
-                self.upload_errors['http_500'] += 1
-            else:
-                self.upload_errors['other'] += 1
-        else:
-            self.upload_errors['other'] += 1
-    
-    def display_error_summary(self):
-        if not any(self.query_errors.values()) and not any(self.upload_errors.values()):
-            return
-        
-        headers = ["Error Type", "Count"]
-        rows = []
-        
-        if any(self.upload_errors.values()):
-            rows.extend([
-                ["Upload Errors", ""],
-                *[(f"  {k.replace('_', ' ').title()}", v) 
-                  for k, v in self.upload_errors.items() if v > 0]
-            ])
-        
-        if any(self.query_errors.values()):
-            if rows:  # Add spacing if we have upload errors
-                rows.append(["", ""])
-            rows.extend([
-                ["Query Errors", ""],
-                *[(f"  {k.replace('_', ' ').title()}", v) 
-                  for k, v in self.query_errors.items() if v > 0]
-            ])
-        
-        if rows:
-            logger.info("\nError Summary\n" + create_table(headers, rows))
-
-# Create global instances
-error_tracker = ErrorTracker()
