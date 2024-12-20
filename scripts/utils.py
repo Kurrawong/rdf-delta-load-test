@@ -42,15 +42,14 @@ class Metrics:
                 "Prez Initial CPU (%)": f"{container_stats['docker-prez-1']['cpu_percent']:.1f}"
             }
     
-    def add_generation_metrics(self, total_files, successful, failed, total_size, container_stats=None):
-        total_time = time.time() - self.start_time
+    def add_generation_metrics(self, total_files, successful, failed, total_size, exec_time=None, peak_memory=None, container_stats=None):
         self.generation_metrics = {
             "Total Files Generated": total_files,
             "Successful Generations": successful,
             "Failed Generations": failed,
             "Generation Size (MB)": f"{total_size / 1024 / 1024:.2f}",
-            "Generation Time (s)": f"{total_time:.2f}",
-            "Generation Rate (MB/s)": f"{(total_size / 1024 / 1024) / total_time:.2f}"
+            "Generation Time (s)": f"{exec_time:.2f}" if exec_time else "N/A",
+            "Generation Rate (MB/s)": f"{(total_size / 1024 / 1024) / exec_time:.2f}" if exec_time else "N/A"
         }
         if container_stats:
             self.generation_metrics.update({
