@@ -2,7 +2,7 @@ services:
   rdf-delta-server:
     image: rdf-delta-server
     ports:
-      - "1066:1066"
+      - 1066:1066
     networks:
         - loadtest
     healthcheck:
@@ -13,7 +13,7 @@ services:
   rdf-delta-fuseki-server:
     image: rdf-delta-fuseki-server
     ports:
-      - "3030:3030"
+      - 3030:3030
     networks:
         - loadtest
     volumes:
@@ -40,6 +40,8 @@ services:
     environment:
       SPARQL_ENDPOINT: http://rdf-delta-fuseki-server:3030/myds/sparql
       ENABLE_SPARQL_ENDPOINT: true
+      SEARCH_METHOD: fts_fuseki
+      SEARCH_PREDICATES: '["https://schema.org/name", "https://schema.org/review"]'
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://prez:8000/health"]
       retries: 3

@@ -1,0 +1,8 @@
+prefix schema: <https://schema.org/>
+prefix text: <http://jena.apache.org/text#>
+
+select *
+where {
+	?uri ?score ?match ?pred ?graph text:query ( "tasmania" )
+}
+limit 100

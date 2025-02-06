@@ -2,42 +2,12 @@
 
 version: "3"
 
-env:
-  LT__DELTA_ENDPOINT: https://gswardfds.azurewebsites.net/
-  LT__PATCH_LOG: myds
-  LT__SPARQL_ENDPOINT: https://gswaprez.azurewebsites.net/sparql
-
 tasks:
-  dev-load-only:
-    env:
-      LT__LOG_LEVEL: DEBUG
-      LT__DELTA_ENDPOINT: http://localhost:1066/
-      LT__SPARQL_ENDPOINT: http://localhost:8000/sparql
+  default:
+    dotenv: ['.env']
     cmds:
-      - python scripts/main.py
-
-  dev:
-    env:
-      LT__LOG_LEVEL: DEBUG
-      LT__DELTA_ENDPOINT: http://localhost:1066/
-      LT__SPARQL_ENDPOINT: http://localhost:8000/sparql
+      - docker compose -f docker/compose.yaml up --wait --remove-orphans
+      - poetry run python scripts/main.py
+  down:
     cmds:
-      - docker compose -f docker/compose.yaml up --wait
-      - python scripts/main.py
       - docker compose -f docker/compose.yaml down
-
-  small_rw:
-    env:
-      LT__RDF_FILE_SIZE: 30
-      LT__RDF_VOLUME: 500
-      LT__NUM_QUERIES: 500
-      LT__QUERY_CONCURRENCY: 20
-    cmds:
-      - python scripts/main.py
-
-  large_sw:
-    env:
-      LT__RDF_FILE_SIZE: 100
-      LT__RDF_VOLUME: 100
-    cmds:
-      - python scripts/main.py
