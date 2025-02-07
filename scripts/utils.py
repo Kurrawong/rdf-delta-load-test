@@ -1,5 +1,5 @@
 import csv
-import string
+from formatting import create_table
 import functools
 import logging
 import random
@@ -14,13 +14,12 @@ from uuid import uuid4
 import httpx
 from config import config
 from jinja2 import Template
-from rdf_graph_gen.rdf_graph_generator import generate_rdf
 from rdflib import Dataset, Graph
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
-RECORDS_PER_MB = 550
+RECORDS_PER_MB = 1500
 FILE_SIZE_MB = 1
 
 
@@ -325,7 +324,7 @@ def get_last_patch_id() -> str:
     return latest
 
 
-def generate_simple_rdf(
+def generate_rdf(
     output_file: str, names: list, reviews: list, polygons: list, number: int
 ) -> None:
     data = []
@@ -368,13 +367,10 @@ def load_destinations():
 
 
 def generate_patches() -> None:
-    """generate random RDF data optionally using a  SHACL shape file
+    """generate random RDF data
 
-    WARNING: Shape file generation is very slow
-
-    outputs are stored under the config.rdf_dir directory in a
-    subfolder called {rdf_file_size}-{rdf_volume}. In this way, the
-    generated data can be reused.
+    outputs are stored under the config.rdf_dir directory
+    In this way, the generated data can be reused.
     """
 
     start_time = time.time()  # Local timing
@@ -392,27 +388,17 @@ def generate_patches() -> None:
     futures = []
     with ProcessPoolExecutor() as executor:
         for file in range(num_patches):
-            if config.shape_file:
-                futures.append(
-                    executor.submit(
-                        generate_rdf,
-                        shape_file=config.shape_file,
-                        output_file=out_folder / f"file_{file}.ttl",
-                        number=FILE_SIZE_MB * RECORDS_PER_MB,
-                    )
+            names, reviews, polygons = load_destinations()
+            futures.append(
+                executor.submit(
+                    generate_rdf,
+                    names=names,
+                    reviews=reviews,
+                    polygons=polygons,
+                    output_file=out_folder / f"file_{file}.ttl",
+                    number=FILE_SIZE_MB * RECORDS_PER_MB,
                 )
-            else:
-                names, reviews, polygons = load_destinations()
-                futures.append(
-                    executor.submit(
-                        generate_simple_rdf,
-                        names=names,
-                        reviews=reviews,
-                        polygons=polygons,
-                        output_file=out_folder / f"file_{file}.ttl",
-                        number=FILE_SIZE_MB * RECORDS_PER_MB,
-                    )
-                )
+            )
         for i, future in enumerate(futures, 1):
             try:
                 logger.info(f"generating file {i}/{num_patches}")
@@ -455,71 +441,6 @@ def generate_patches() -> None:
     return
 
 
-def create_table(headers: list, rows: list, alignments: list = None) -> str:
-    """Create a text-based table with headers and rows"""
-    if alignments is None:
-        alignments = ["left"] * len(headers)
-
-    def split_number(value):
-        try:
-            value = str(value).replace(",", "")
-            if "." in value:
-                left, right = value.split(".")
-                return left, right
-            return value, ""
-        except:
-            return value, ""
-
-    # Find maximum widths for decimal alignment
-    max_left_width = 0
-    max_right_width = 0
-    for row in rows:
-        if row[1]:  # Skip empty values
-            left, right = split_number(str(row[1]))
-            max_left_width = max(max_left_width, len(left))
-            max_right_width = max(max_right_width, len(right))
-
-    # Calculate column widths
-    column_widths = [
-        35,
-        max_left_width + (max_right_width > 0 and max_right_width + 1 or 0) + 2,
-    ]
-
-    def format_cell(content, width, alignment, col_idx):
-        content = str(content)
-        if alignment == "right" and col_idx == 1 and content:  # Number column
-            return content.rjust(width)
-        elif alignment == "center":
-            return content.center(width)
-        return content.ljust(width)
-
-    separator = "+" + "+".join(["-" * width for width in column_widths]) + "+"
-    header_row = (
-        "|"
-        + "|".join(
-            format_cell(h, w, "center", i)
-            for i, (h, w) in enumerate(zip(headers, column_widths))
-        )
-        + "|"
-    )
-
-    formatted_rows = []
-    for row in rows:
-        formatted_row = (
-            "|"
-            + "|".join(
-                format_cell(cell, width, align, i)
-                for i, (cell, width, align) in enumerate(
-                    zip(row, column_widths, alignments)
-                )
-            )
-            + "|"
-        )
-        formatted_rows.append(formatted_row)
-
-    return "\n".join([separator, header_row, separator, *formatted_rows, separator])
-
-
 @profile
 def submit_patches() -> None:
     logger.info("uploading patch logs to rdf delta server")
@@ -533,8 +454,7 @@ def submit_patches() -> None:
     failed_uploads = 0
 
     num_files = config.rdf_volume_mb // FILE_SIZE_MB
-    files = Path(config.rdf_dir).iterdir()
-    for i, file in files:
+    for i, file in enumerate(Path(config.rdf_dir).iterdir(), start=1):
         if i > num_files:
             break
         file_size = file.stat().st_size
@@ -569,9 +489,14 @@ def submit_patches() -> None:
     # Calculate metrics
     total_time = time.time() - start_time
 
+    if failed_uploads > 0:
+        logger.info(f"failed to load {failed_uploads} patches")
+    else:
+        logger.info("all patches loaded successfully")
+
     # Return metrics dict that will be updated by the profile decorator
     metrics_dict = {
-        "total_files": len(files),
+        "total_files": num_files,
         "successful": successful_uploads,
         "failed": failed_uploads,
         "total_size": total_size,
@@ -585,9 +510,9 @@ def submit_query(client: httpx.Client):
     start_time = time.time()
     queries = list(Path(config.query_dir).iterdir())
     query = random.choice(queries)
-    response = client.get(
+    response = client.post(
         url=config.sparql_endpoint,
-        params={"query": query.read_text()},
+        data=query.read_bytes(),
         headers={"Content-Type": "application/sparql-query"},
     )
     response.raise_for_status()
@@ -632,6 +557,7 @@ def submit_queries() -> None:
                 query_times.append(query_time)
                 successful_queries += 1
             except Exception as e:
+                logger.error(f"Error submitting query {i}: {e}")
                 error_tracker.add_query_error(e)
                 errors += 1
 
@@ -669,7 +595,11 @@ def services_up() -> tuple[bool, bool]:
         delta_up = False
 
     try:
-        response = httpx.get(config.sparql_endpoint + "?query=ask%20{}")
+        response = httpx.post(
+            config.sparql_endpoint,
+            data="ask {}",
+            headers={"Content-Type": "application/sparql-query"},
+        )
         logger.debug(f"SPARQL endpoint status: {response.status_code}")
         response.raise_for_status()
         logger.info("✓ SPARQL endpoint is available")
@@ -691,10 +621,10 @@ def get_container_stats(container_names: list[str]) -> dict:
         client = docker.from_env()
         logger.info("Docker client created successfully")
     except (ImportError, ModuleNotFoundError):
-        logger.info("Docker package not installed - skipping container stats")
+        logger.debug("Docker package not installed - skipping container stats")
         return {}
     except Exception as e:
-        logger.info(f"Docker not available - {str(e)}")
+        logger.debug(f"Docker not available - {str(e)}")
         return {}
 
     stats = {}
@@ -730,6 +660,6 @@ def get_container_stats(container_names: list[str]) -> dict:
                     "cpu_percent": cpu_percent,
                 }
         except Exception as e:
-            logger.info(f"Skipping Docker stats for {name}: {e}")
+            logger.debug(f"Skipping Docker stats for {name}: {e}")
 
     return stats

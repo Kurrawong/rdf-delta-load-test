@@ -1,6 +1,11 @@
 import logging
+from formatting import create_table
 import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(override=False)
 
 logger = logging.getLogger(__name__)
 
@@ -12,13 +17,9 @@ class Config:
     :param delta_endpoint: rdf delta endpoint
     :param patch_log: rdf delta data source (same as fuseki dataset name)
     :param sparql_endpoint: sparql endpoint
-    :param shape_file: optional shape file to use for rdf generation (slow)
-    :param reuse_rdf: default True. to reuse previously generated data
-    :param rdf_folder: where generated rdf data is stored
-    :param http_timeout: timeout for http requests
-    :param rdf_file_size: size of individual RDF files to generate (in MB)
-    :param rdf_volume: total volume of RDF data to generate (in MB)
-    :param query_template: a sparql query to use for testing the queries
+    :param rdf_dir: where generated rdf data is stored (relative to the project root)
+    :param http_timeout: timeout for http requests (in seconds)
+    :param rdf_volume_mb: total volume of RDF data to generate (in MB)
     :param num_queries: how many queries to execute
     :param query_concurrency: how many queries should be executed simultaneously
     :param delay_between_patch_submissions: a delay (in seconds) between submission of RDF patch logs defaults to 0 for no delay
@@ -34,7 +35,6 @@ class Config:
 
         self.rdf_dir: str = str(Path(__file__).parent.parent / "rdf")
         self.rdf_volume_mb: int = 2
-        self.shape_file: str | None = None
 
         self.query_dir: str = str(Path(__file__).parent / "queries")
         self.num_queries: int = 10
@@ -46,9 +46,12 @@ class Config:
             if env_value is not None:
                 if k == "log_level":
                     self.__dict__[k] = getattr(logging, env_value.upper())
-                elif k.endswith("endpoint"):
-                    self.__dict__[k] = env_value
-                    # .rstrip("/") + "/"
+                elif k == "delta_endpoint":
+                    self.__dict__[k] = env_value.rstrip("/") + "/"
+                elif k == "sparql_endpoint":
+                    self.__dict__[k] = env_value.rstrip("/")
+                elif k == "rdf_dir":
+                    self.__dict__[k] = str(Path(__file__).parent.parent / env_value)
                 elif isinstance(v, bool):
                     self.__dict__[k] = self.str_to_bool(env_value)
                 elif isinstance(v, int):
@@ -62,11 +65,18 @@ class Config:
         return value.lower() in ("yes", "true", "t", "1")
 
     def __repr__(self):
-        return (
-            "CONFIG\n\t"
-            + "\n\t".join([f"{k}: {v}" for k, v in vars(self).items()])
-            + "\n"
-        )
+        docstring = self.__doc__
+        doc_lines = docstring.splitlines()
+        rows = []
+        for line in doc_lines:
+            if ":param" in line:
+                param_name, param_info = line.split(":", 2)[1:]
+                param_name = param_name.split("param ", 1)[1].strip()
+                param_info = param_info.strip()
+                param_value = eval(f"self.{param_name}")
+                rows.append([param_name, param_value, param_info])
+        headers = ["Setting", "Value", "Description"]
+        return create_table(headers, rows)
 
 
 config = Config()

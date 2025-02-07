@@ -1,9 +1,9 @@
-@prefix schema: <http://schema.org/> .
+@prefix schema: <https://schema.org/> .
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix geo: <http://www.opengis.net/ont/geosparql#> .
 
-{%- for row in data -%}
+{% for row in data %}
 <https://example.org/{{ row['id'] }}>
     a schema:TouristDestination ;
 	schema:name "{{ row['name'] }}" ;

@@ -1,4 +1,4 @@
-PREFIX : <file:///home/laws/PycharmProjects/rdf-delta-load-test/#>
+PREFIX : <http://load.test/>
 PREFIX delta: <http://jena.apache.org/rdf-delta#>
 PREFIX fuseki: <http://jena.apache.org/fuseki#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -65,7 +65,7 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 :tdb_dataset
     a tdb2:DatasetTDB2 ;
     tdb2:location "/fuseki/databases/myds" ;
-    tdb2:unionDefaultGraph true ;
+    tdb2:unionDefaultGraph false ;
 .
 
 :text_dataset

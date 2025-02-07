@@ -3,6 +3,6 @@ prefix text: <http://jena.apache.org/text#>
 
 select *
 where {
-	?uri ?score ?match ?pred ?graph text:query ( "tasmania" )
+	?s text:query (schema:review "summertime")
 }
 limit 100
