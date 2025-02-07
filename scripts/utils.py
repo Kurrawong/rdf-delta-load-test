@@ -1,5 +1,4 @@
 import csv
-from formatting import create_table
 import functools
 import logging
 import random
@@ -13,12 +12,15 @@ from uuid import uuid4
 
 import httpx
 from config import config
+from formatting import create_table
 from jinja2 import Template
 from rdflib import Dataset, Graph
 
 logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
+RDF_DIR = Path(__file__).parent.parent / "rdf"
+QUERY_DIR = Path(__file__).parent.parent / "queries"
 RECORDS_PER_MB = 1500
 FILE_SIZE_MB = 1
 
@@ -369,12 +371,12 @@ def load_destinations():
 def generate_patches() -> None:
     """generate random RDF data
 
-    outputs are stored under the config.rdf_dir directory
+    outputs are stored under the RDF_DIR directory
     In this way, the generated data can be reused.
     """
 
     start_time = time.time()  # Local timing
-    out_folder = Path(config.rdf_dir)
+    out_folder = RDF_DIR
     if not out_folder.exists():
         out_folder.mkdir()
     out_folder_size = get_folder_size(out_folder)
@@ -454,7 +456,7 @@ def submit_patches() -> None:
     failed_uploads = 0
 
     num_files = config.rdf_volume_mb // FILE_SIZE_MB
-    for i, file in enumerate(Path(config.rdf_dir).iterdir(), start=1):
+    for i, file in enumerate(RDF_DIR.iterdir(), start=1):
         if i > num_files:
             break
         file_size = file.stat().st_size
@@ -508,7 +510,7 @@ def submit_patches() -> None:
 def submit_query(client: httpx.Client):
     """Execute a single query and return its execution time"""
     start_time = time.time()
-    queries = list(Path(config.query_dir).iterdir())
+    queries = list(QUERY_DIR.iterdir())
     query = random.choice(queries)
     response = client.post(
         url=config.sparql_endpoint,

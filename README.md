@@ -13,37 +13,21 @@ cd rdf-delta-load-test
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-
 ```
 
 ## Usage
 
-### Pre baked configurations
+Create a file called `.env` in the root directory of the project
+and set the desired configuration values.
 
-The load test configurations are managed using [go-task](https://taskfile.dev). this
-makes it easier to set and override environment variables for each scenario.
+> The default variables and values are shown in [.env-template](.env-template)
 
-> [!NOTE]  
-> if you can't or dont' want to install go-task then you can still run the load test
-> you just need to specify the configuration for each scenario manually. See the
-> [manual configuration](#manual-configuration) section below.
+Run the main script
 
 ```bash
-# install go-task
-sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+python scripts/main.py
 ```
 
-You can see a list of all the pre-baked configurations by running:
-
-```bash
-task --list-all
-```
-
-To run the small read write configuration you would run:
-
-```bash
-task small_rw
-```
 
 ### Manual configurations
 
