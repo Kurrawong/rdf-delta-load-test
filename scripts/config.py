@@ -5,7 +5,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv(override=False)
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env-dev", override=False)
 
 logger = logging.getLogger(__name__)
 

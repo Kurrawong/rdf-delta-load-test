@@ -5,3 +5,4 @@ __pycache__
 http/
 .env
 .env-az
+.env-dev
