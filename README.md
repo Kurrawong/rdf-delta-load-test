@@ -38,3 +38,8 @@ python scripts/main.py
 Generated RDF will be reused across tests. If you need to regenerate it for some reason,
 simply delete the `rdf` folder in the root directory. This folder is created
 automatically after you run the script for the first time.
+
+> [!IMPORTANT]
+> you will need to force the regeneration of RDF if you change the indexed_property
+> settings. Again, you can do this by just deleting the `rdf` folder.
+
