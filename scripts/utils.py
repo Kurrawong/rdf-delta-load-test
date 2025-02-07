@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(config.log_level)
 
 RDF_DIR = Path(__file__).parent.parent / "rdf"
-QUERY_DIR = Path(__file__).parent.parent / "queries"
+QUERY_DIR = Path(__file__).parent.parent / "scripts" / "queries"
 RECORDS_PER_MB = 1500
 FILE_SIZE_MB = 1
 
@@ -486,7 +486,6 @@ def submit_patches() -> None:
             failed_uploads += 1
             errors.append(file)
         prev_id = re.findall(r"H id <(.*)>", patch)[0]
-        time.sleep(config.delay_between_patch_submissions)
 
     # Calculate metrics
     total_time = time.time() - start_time
