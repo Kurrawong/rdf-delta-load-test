@@ -18,22 +18,29 @@ class Config:
     :param sparql_endpoint: sparql endpoint
     :param http_timeout: timeout for http requests (in seconds)
     :param rdf_volume_mb: total volume of RDF data to generate (in MB)
+    :param query_type: Type of query to submit ("simple", "fts", "geo")
     :param num_queries: how many queries to execute
     :param query_concurrency: how many queries should be executed simultaneously
+    :param indexed_property_1: an rdf predicate to use in the generated RDF. It should be included in the text index for your fuseki instance
+    :param indexed_property_2: as per indexed_property_1
     """
 
     def __init__(self):
-        self.log_level: int = logging.INFO
+        self.log_level: int = logging.DEBUG
 
         self.delta_endpoint: str = "http://localhost:1066/"
         self.patch_log: str = "myds"
-        self.sparql_endpoint: str = "http://localhost:8000/sparql"
+        self.sparql_endpoint: str = "http://localhost:3030/myds/sparql"
         self.http_timeout: int = 60
 
         self.rdf_volume_mb: int = 2
 
+        self.query_type: str = "simple"
         self.num_queries: int = 10
         self.query_concurrency: int = 5
+
+        self.indexed_property_1: str = "https://schema.org/name"
+        self.indexed_property_2: str = "https://schema.org/review"
 
         for k, v in vars(self).items():
             env_value = os.environ.get(f"LT__{k.upper()}", None)

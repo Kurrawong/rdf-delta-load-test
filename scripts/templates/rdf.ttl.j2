@@ -6,8 +6,8 @@
 {% for row in data %}
 <https://example.org/{{ row['id'] }}>
     a schema:TouristDestination ;
-	schema:name "{{ row['name'] }}" ;
-	schema:review """{{ row['review'] }}""" ;
+	<{{ row['indexed_property_1'] }}> "{{ row['name'] }}" ;
+	<{{ row['indexed_property_2'] }}> """{{ row['review'] }}""" ;
 	schema:geo [
 	  a schema:GeoCoordinates ;
 	  geo:asWKT "{{ row['wkt_coords'] }}" ;

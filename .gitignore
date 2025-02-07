@@ -3,6 +3,5 @@ rdf
 __pycache__
 .venv/
 http/
-.env
-.env-az
-.env-dev
+.env*
+!.env-template

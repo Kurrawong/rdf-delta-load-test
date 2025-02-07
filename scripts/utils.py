@@ -1,4 +1,5 @@
 import csv
+import os
 import functools
 import logging
 import random
@@ -337,6 +338,8 @@ def generate_rdf(
                 "name": random.choice(names),
                 "review": random.choice(reviews),
                 "wkt_coords": f"POINT({random.randint(-100, 100)} {random.randint(-100, 100)})",
+                "indexed_property_1": config.indexed_property_1,
+                "indexed_property_2": config.indexed_property_2,
             }
         )
 
@@ -352,7 +355,10 @@ def get_folder_size(folder: Path) -> float:
     """Calculate the size of a folder in MB"""
     if not folder.exists():
         return 0
-    return sum(int(f.stat().st_size) for f in Path(folder).iterdir()) / (1024**2)
+    total_size = 0
+    for file in folder.iterdir():
+        total_size += os.path.getsize(file)
+    return total_size / 1024 / 1024
 
 
 def load_destinations():
@@ -417,7 +423,7 @@ def generate_patches() -> None:
     total_time = time.time() - start_time
     avg_time_per_file = total_time / num_patches
     rdf_folder_size = get_folder_size(out_folder)
-    throughput = rdf_folder_size / total_time / 1024 / 1024  # MB/s
+    throughput = rdf_folder_size / total_time  # MB/s
 
     # Create and display the results table
     headers = ["Metric", "Value"]
@@ -425,7 +431,7 @@ def generate_patches() -> None:
         ["Total Files", num_patches],
         ["Successful Generations", num_patches - errors],
         ["Failed Generations", errors],
-        ["Total Size (MB)", f"{rdf_folder_size / 1024 / 1024:.2f}"],
+        ["Total Size (MB)", f"{rdf_folder_size:.2f}"],
         ["Total Time (s)", f"{total_time:.2f}"],
         ["Avg Time/File (s)", f"{avg_time_per_file:.2f}"],
         ["Throughput (MB/s)", f"{throughput:.2f}"],
@@ -509,32 +515,33 @@ def submit_patches() -> None:
 def submit_query(client: httpx.Client):
     """Execute a single query and return its execution time"""
     start_time = time.time()
-    queries = list(QUERY_DIR.iterdir())
-    query = random.choice(queries)
+    if config.query_type == "simple":
+        query = (QUERY_DIR / "simple.rq").read_bytes()
+    elif config.query_type == "fts":
+        template = Template((QUERY_DIR / "fts.rq.j2").read_text())
+        query = template.render(
+            {
+                "indexed_property_1": config.indexed_property_1,
+                "indexed_property_2": config.indexed_property_2,
+            }
+        )
+    elif config.query_type == "geo":
+        raise NotImplementedError("geo query type not yet implemented")
+    else:
+        raise ValueError(
+            f"{config.query_type} is not a valid query type. Available options are [simple, fts, geo]"
+        )
+    logger.debug(query)
     response = client.post(
         url=config.sparql_endpoint,
-        data=query.read_bytes(),
+        data=query,
         headers={"Content-Type": "application/sparql-query"},
     )
     response.raise_for_status()
+    logger.debug(response.text)
     query_time = time.time() - start_time
     logger.debug(f"Query took {query_time:.2f}s")
     return query_time
-
-
-def format_number(value: float, decimals: int = 2) -> str:
-    """Format a number with 5-space integer part and fixed decimal places"""
-    # Split into integer and decimal parts
-    int_part = int(value)
-    decimal_part = abs(value - int_part)
-
-    # Format integer part to take up exactly 5 spaces (right-aligned)
-    formatted_int = f"{int_part:5d}"
-
-    # Format decimal part with specified precision
-    formatted_decimal = f"{decimal_part:.{decimals}f}"[2:]  # Remove "0."
-
-    return f"{formatted_int}.{formatted_decimal}"
 
 
 @profile

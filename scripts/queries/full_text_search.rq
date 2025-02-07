@@ -1,8 +1,0 @@
-prefix schema: <https://schema.org/>
-prefix text: <http://jena.apache.org/text#>
-
-select *
-where {
-	?s text:query (schema:review "summertime")
-}
-limit 100

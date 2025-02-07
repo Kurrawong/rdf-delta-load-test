@@ -3,14 +3,14 @@
 version: "3"
 
 tasks:
-  dev:
-    dotenv: ['.env-dev']
+  docker:
+    dotenv: ['.env-docker']
     cmds:
       - docker compose -f docker/compose.yaml up --wait --remove-orphans
       - poetry run python scripts/main.py
       - docker compose -f docker/compose.yaml down
-  az:
-    dotenv: ['.env-az']
+  azure:
+    dotenv: ['.env-azure']
     cmds:
       - poetry run python scripts/main.py
   default:
