@@ -24,6 +24,7 @@ RDF_DIR = Path(__file__).parent.parent / "rdf"
 QUERY_DIR = Path(__file__).parent.parent / "scripts" / "queries"
 RECORDS_PER_MB = 1500
 FILE_SIZE_MB = 1
+SEARCH_TERMS = ["lady", "coon", "heads", "discover"]
 
 
 class Metrics:
@@ -523,6 +524,7 @@ def submit_query(client: httpx.Client):
             {
                 "indexed_property_1": config.indexed_property_1,
                 "indexed_property_2": config.indexed_property_2,
+                "search_term": random.choice(SEARCH_TERMS)
             }
         )
     elif config.query_type == "geo":

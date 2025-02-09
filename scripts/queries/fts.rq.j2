@@ -2,6 +2,6 @@ prefix text: <http://jena.apache.org/text#>
 
 select *
 where {
-	?s text:query ( <{{ indexed_property_1 }}> <{{ indexed_property_2 }}> "summertime")
+	?s text:query ( <{{ indexed_property_1 }}> <{{ indexed_property_2 }}> "{{ search_term }}" )
 }
 limit 100
