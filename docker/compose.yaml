@@ -4,7 +4,7 @@ services:
     ports:
       - 1066:1066
     networks:
-        - loadtest
+      - loadtest
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:1066"]
       retries: 3
@@ -15,7 +15,7 @@ services:
     ports:
       - 3030:3030
     networks:
-        - loadtest
+      - loadtest
     volumes:
       - type: bind
         source: config.ttl
@@ -25,25 +25,6 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3030/myds"]
-      retries: 3
-      interval: 5s
-      timeout: 5s
-  prez:
-    image: ghcr.io/rdflib/prez:latest
-    ports:
-      - 8000:8000
-    networks:
-        - loadtest
-    depends_on:
-      rdf-delta-fuseki-server:
-        condition: service_healthy
-    environment:
-      SPARQL_ENDPOINT: http://rdf-delta-fuseki-server:3030/myds/sparql
-      ENABLE_SPARQL_ENDPOINT: true
-      SEARCH_METHOD: fts_fuseki
-      SEARCH_PREDICATES: '["https://schema.org/name", "https://schema.org/review"]'
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://prez:8000/health"]
       retries: 3
       interval: 5s
       timeout: 5s
