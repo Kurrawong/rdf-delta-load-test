@@ -1,6 +1,6 @@
 services:
   rdf-delta-server:
-    image: rdf-delta-server
+    image: ghcr.io/kurrawong/rdf-delta
     ports:
       - 1066:1066
     networks:
@@ -11,7 +11,8 @@ services:
       interval: 5s
       timeout: 5s
   rdf-delta-fuseki-server:
-    image: rdf-delta-fuseki-server
+    image: ghcr.io/kurrawong/rdf-delta
+    command: ["/bin/bash", "-c", "/opt/rdf-delta/fuseki-entrypoint.sh"]
     ports:
       - 3030:3030
     networks:
@@ -19,7 +20,7 @@ services:
     volumes:
       - type: bind
         source: config.ttl
-        target: /fuseki/config.ttl
+        target: /opt/rdf-delta/config.ttl
     depends_on:
       rdf-delta-server:
         condition: service_healthy
