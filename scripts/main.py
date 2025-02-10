@@ -16,9 +16,10 @@ def main():
         logger.error("No services are available. Exiting.")
         return
 
-    generate_patches()
-    if delta_up:
-        submit_patches()
+    if config.rdf_volume_mb >= 1:
+        generate_patches()
+        if delta_up:
+            submit_patches()
     if sparql_up:
         submit_queries()
 
