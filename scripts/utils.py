@@ -1,4 +1,5 @@
 import csv
+import math
 import os
 import functools
 import logging
@@ -22,7 +23,7 @@ logger.setLevel(config.log_level)
 
 RDF_DIR = Path(__file__).parent.parent / "rdf"
 QUERY_DIR = Path(__file__).parent.parent / "scripts" / "queries"
-RECORDS_PER_MB = 1500
+RECORDS_PER_MB = 1800
 FILE_SIZE_MB = 1
 SEARCH_TERMS = ["lady", "coon", "heads", "discover"]
 
@@ -44,9 +45,6 @@ class Metrics:
                 "Fuseki Server Memory Limit (MB)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['memory_limit_mb']:.2f}",
                 "Fuseki Server Initial Memory (MB)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['memory_usage_mb']:.2f}",
                 "Fuseki Server Initial CPU (%)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['cpu_percent']:.1f}",
-                "Prez Memory Limit (MB)": f"{container_stats['docker-prez-1']['memory_limit_mb']:.2f}",
-                "Prez Initial Memory (MB)": f"{container_stats['docker-prez-1']['memory_usage_mb']:.2f}",
-                "Prez Initial CPU (%)": f"{container_stats['docker-prez-1']['cpu_percent']:.1f}",
             }
 
     def add_generation_metrics(
@@ -140,8 +138,6 @@ class Metrics:
                     "Delta Server CPU (%)": f"{container_stats['docker-rdf-delta-server-1']['cpu_percent']:.1f}",
                     "Fuseki Server Memory (MB)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['memory_usage_mb']:.2f}",
                     "Fuseki Server CPU (%)": f"{container_stats['docker-rdf-delta-fuseki-server-1']['cpu_percent']:.1f}",
-                    "Prez Memory (MB)": f"{container_stats['docker-prez-1']['memory_usage_mb']:.2f}",
-                    "Prez CPU (%)": f"{container_stats['docker-prez-1']['cpu_percent']:.1f}",
                 }
             )
 
@@ -264,7 +260,6 @@ def profile(func):
             [
                 "docker-rdf-delta-server-1",
                 "docker-rdf-delta-fuseki-server-1",
-                "docker-prez-1",
             ]
         )
 
@@ -387,8 +382,9 @@ def generate_patches() -> None:
     if not out_folder.exists():
         out_folder.mkdir()
     out_folder_size = get_folder_size(out_folder)
-    gap_mb = max(config.rdf_volume_mb - out_folder_size, 0)
-    num_patches = int(gap_mb // FILE_SIZE_MB)
+    gap_mb = math.ceil(max(config.rdf_volume_mb - out_folder_size, 0))
+    start_numbering_at = len(list(out_folder.iterdir())) + 1
+    num_patches = math.floor(int(gap_mb / FILE_SIZE_MB))
     if num_patches == 0:
         logger.info("all files already generated")
         return
@@ -396,7 +392,7 @@ def generate_patches() -> None:
     errors = 0
     futures = []
     with ProcessPoolExecutor() as executor:
-        for file in range(num_patches):
+        for file in range(start_numbering_at, start_numbering_at + num_patches):
             names, reviews, polygons = load_destinations()
             futures.append(
                 executor.submit(
